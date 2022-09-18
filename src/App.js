@@ -7,8 +7,12 @@ import { loadContract } from './utils/load-contract';
 import './App.scss';
 
 import Web3 from 'web3';
+import { useCallback } from 'react';
+import Contract from '@truffle/contract/lib/contract';
+import contract from '@truffle/contract';
 
 function App() {
+    // state variables
     const [Web3Api, setWeb3Api] = useState({
         provider: null,
         web3: null,
@@ -17,6 +21,13 @@ function App() {
 
     const [Account, setAccount] = useState(null);
     const [balance, setBalance] = useState(null);
+    const [shouldReload, setShouldReload] = useState(false);
+
+    const reloadEffect = () => setShouldReload(!shouldReload);
+
+    const setAccountListner = (provider) => {
+        provider.on('accountChanged', (accounts) => setAccount(accounts[0]));
+    };
 
     useEffect(() => {
         const loadProvider = async () => {
@@ -25,6 +36,7 @@ function App() {
             const contract = await loadContract('Faucet', provider);
 
             if (provider) {
+                setAccountListner(provider);
                 setWeb3Api({
                     provider,
                     contract,
@@ -48,7 +60,7 @@ function App() {
         };
 
         Web3Api.contract && loadBalance();
-    }, [Web3Api]);
+    }, [Web3Api, shouldReload]);
 
     useEffect(() => {
         const getAccount = async () => {
@@ -59,39 +71,79 @@ function App() {
         Web3Api.web3 && getAccount();
     }, [Web3Api.web3]);
 
+    const addFunds = async () => {
+        const { contract, web3 } = Web3Api;
+        await contract.addFunds({
+            from: Account,
+            value: web3.utils.toWei('0.1', 'ether') // 1eth
+        });
+
+        // window.location.reload();
+        reloadEffect();
+    };
+
+    const withdrawFunds = async () => {
+        const { contract, web3 } = Web3Api;
+        const withdrawAmount = web3.utils.toWei('0.1', 'ether'); // 1eth
+        await contract.withdraw(withdrawAmount, {
+            from: Account
+        });
+        reloadEffect();
+    };
+
     const enableEthHandler = async () => {
         const account = await Web3Api.provider.request({
             method: 'eth_requestAccounts'
         });
-
+        setAccountListner(Web3Api.provider);
         console.log(account);
     };
+
+    console.log(contract);
 
     return (
         <div className='faucet-wrapper'>
             <div className='faucet'>
-                <div className='account'>
-                    <strong>Account: </strong>
-                    <span>
-                        {' '}
-                        {Account ? (
-                            Account
-                        ) : (
-                            <button
-                                className='button is-white'
-                                onClick={enableEthHandler}
-                            >
-                                Connect metamask
-                            </button>
-                        )}
-                    </span>
+                <div className='address'>
+                    <div className='account'>
+                        <strong>Account: </strong>
+                        <span>
+                            {' '}
+                            {Account ? (
+                                Account
+                            ) : (
+                                <button
+                                    className='button is-white'
+                                    onClick={enableEthHandler}
+                                >
+                                    Connect metamask
+                                </button>
+                            )}
+                        </span>
+                    </div>
+                    <div className='faucet-account'>
+                        <strong>Contract addr: </strong>
+                        <span>
+                            {' '}
+                            {Web3Api.contract
+                                ? Web3Api.contract.address
+                                : 'Contract provider not found'}
+                        </span>
+                    </div>
                 </div>
                 <div className='balance-view'>
-                    Current Balance: <strong>{balance}</strong> ETH
+                    Balance: <strong>{balance}</strong> ETH
                 </div>
                 <div className='btn-wrapper'>
-                    <button className='button is-link '>Donate</button>
-                    <button className='button is-primary '>Withdraw</button>
+                    <button className='button is-link ' onClick={addFunds}>
+                        Donate 0.1eth
+                    </button>
+                    <button
+                        className='button is-primary '
+                        onClick={withdrawFunds}
+                    >
+                        Withdraw 0.1eth
+                    </button>
                 </div>
             </div>
         </div>
