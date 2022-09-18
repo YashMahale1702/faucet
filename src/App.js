@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useState } from 'react';
 import detectEthereumProvider from '@metamask/detect-provider';
 
+import { loadContract } from './utils/load-contract';
+
 import './App.scss';
 
 import Web3 from 'web3';
@@ -9,19 +11,23 @@ import Web3 from 'web3';
 function App() {
     const [Web3Api, setWeb3Api] = useState({
         provider: null,
-        web3: null
+        web3: null,
+        contract: null
     });
 
     const [Account, setAccount] = useState(null);
+    const [balance, setBalance] = useState(null);
 
     useEffect(() => {
         const loadProvider = async () => {
             // provider is -> Metamask
             const provider = await detectEthereumProvider();
+            const contract = await loadContract('Faucet', provider);
 
             if (provider) {
                 setWeb3Api({
                     provider,
+                    contract,
                     web3: new Web3(provider)
                 });
             } else {
@@ -31,6 +37,18 @@ function App() {
 
         loadProvider();
     }, []);
+
+    useEffect(() => {
+        const loadBalance = async () => {
+            const { contract, web3 } = Web3Api;
+            const balance = await web3.eth.getBalance(contract.address);
+            const balanceInEth = web3.utils.fromWei(balance, 'ether');
+
+            setBalance(balanceInEth);
+        };
+
+        Web3Api.contract && loadBalance();
+    }, [Web3Api]);
 
     useEffect(() => {
         const getAccount = async () => {
@@ -69,7 +87,7 @@ function App() {
                     </span>
                 </div>
                 <div className='balance-view'>
-                    Current Balance: <strong>10</strong> ETH
+                    Current Balance: <strong>{balance}</strong> ETH
                 </div>
                 <div className='btn-wrapper'>
                     <button className='button is-link '>Donate</button>
